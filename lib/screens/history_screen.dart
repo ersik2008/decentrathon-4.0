@@ -1,103 +1,103 @@
+// lib/screens/history_screen.dart
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/history_item.dart';
 import '../widgets/history_card.dart';
+import '../providers/history_provider.dart';
 
-class HistoryScreen extends StatefulWidget {
+class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key, this.showAppBar = true});
 
   final bool showAppBar;
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
-}
-
-class _HistoryScreenState extends State<HistoryScreen> {
-  // Mock history data
-  final List<HistoryItem> _historyItems = [
-    
-  ];
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.showAppBar ? AppBar(
-        title: const Text('История проверок'),
-      ) : null,
+      appBar: showAppBar
+          ? AppBar(
+              title: const Text('История проверок'),
+            )
+          : null,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!widget.showAppBar) ...[
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text(
-                  'История проверок',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF1A1D21),
+        child: Consumer<HistoryProvider>(
+          builder: (context, provider, child) {
+            final _historyItems = provider.items;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!showAppBar) ...[
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text(
+                      'История проверок',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF1A1D21),
+                          ),
+                    ),
+                  ),
+                ] else
+                  const SizedBox(height: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF32D583).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.analytics,
+                          color: Color(0xFF32D583),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Всего проверок: ${_historyItems.length}',
+                            style: const TextStyle(
+                              color: Color(0xFF32D583),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ] else
-              const SizedBox(height: 8),
-            
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF32D583).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.analytics,
-                      color: Color(0xFF32D583),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Всего проверок: ${_historyItems.length}',
-                        style: const TextStyle(
-                          color: Color(0xFF32D583),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
+                const SizedBox(height: 20),
+                Expanded(
+                  child: _historyItems.isEmpty
+                      ? _buildEmptyState(context)
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          itemCount: _historyItems.length,
+                          itemBuilder: (context, index) {
+                            final item = _historyItems[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: HistoryCard(
+                                item: item,
+                                onTap: () => _showHistoryDetails(context, item),
+                              ),
+                            );
+                          },
                         ),
-                      ),
-                    ),
-                  ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            Expanded(
-              child: _historyItems.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _historyItems.length,
-                      itemBuilder: (context, index) {
-                        final item = _historyItems[index];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: HistoryCard(
-                            item: item,
-                            onTap: () => _showHistoryDetails(item),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(40),
@@ -121,9 +121,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Text(
               'История пуста',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
-              ),
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -141,7 +141,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  void _showHistoryDetails(HistoryItem item) {
+  void _showHistoryDetails(BuildContext context, HistoryItem item) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -169,14 +169,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Text(
                   'Детали проверки',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
                 const SizedBox(height: 16),
                 _buildDetailRow('Дата', _formatDate(item.date)),
                 _buildDetailRow('Чистота', '${item.cleanliness} (${item.cleanlinessConfidence}%)'),
                 _buildDetailRow('Целостность', '${item.integrity} (${item.integrityConfidence}%)'),
                 const SizedBox(height: 20),
+                if (item.imagePath != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      File(item.imagePath!),
+                      height: 160,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

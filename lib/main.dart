@@ -1,7 +1,10 @@
-// main.dart
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:camera/camera.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:indrive_car_condition/screens/gallery_photo_wizard.dart';
+import 'package:provider/provider.dart';
 
 import 'screens/car_photo_wizard.dart';
 import 'screens/landing_screen.dart';
@@ -9,14 +12,31 @@ import 'screens/result_screen.dart';
 import 'screens/info_screen.dart';
 import 'screens/error_screen.dart';
 import 'screens/history_screen.dart';
-import 'navigation/nav_bar.dart'; // подключаем NavBar
+import 'navigation/nav_bar.dart';
+import 'models/history_item.dart';
+import 'providers/history_provider.dart';
 
 late List<CameraDescription> cameras;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Получаем камеры (как у тебя было)
   cameras = await availableCameras();
-  runApp(const InDriveCarConditionApp());
+
+  // Инициализируем Hive
+  await Hive.initFlutter();
+  Hive.registerAdapter(HistoryItemAdapter());
+  final box = await Hive.openBox('history_box'); // используем не generic, потому что adapter хранит HistoryItem
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => HistoryProvider(box)),
+      ],
+      child: const InDriveCarConditionApp(),
+    ),
+  );
 }
 
 class InDriveCarConditionApp extends StatelessWidget {
@@ -78,7 +98,7 @@ class InDriveCarConditionApp extends StatelessWidget {
           ),
         ),
       ),
-      initialRoute: '/nav', // теперь стартовый экран — NavBar
+      initialRoute: '/nav',
       routes: {
         '/nav': (context) => const NavBar(),
         '/camera': (context) => const CarPhotoWizard(),
@@ -86,6 +106,7 @@ class InDriveCarConditionApp extends StatelessWidget {
         '/info': (context) => const InfoScreen(),
         '/error': (context) => const ErrorScreen(),
         '/history': (context) => const HistoryScreen(),
+        '/gallery': (context) => const GalleryPhotoWizard(),
       },
     );
   }

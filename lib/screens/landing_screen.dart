@@ -3,7 +3,6 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../widgets/upload_card.dart';
 
-
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
 
@@ -109,7 +108,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         title: 'Галерея',
                         onTap: () {
                           Navigator.pop(context);
-                          _pickImage(ImageSource.gallery);
+                          Navigator.pushNamed(context, '/gallery');
                         },
                       ),
                     ),

@@ -1,7 +1,11 @@
+// lib/screens/result_screen.dart
 import 'package:flutter/material.dart';
 import 'dart:io';
 import '../widgets/result_card.dart';
 import 'dart:math' as math;
+import 'package:provider/provider.dart';
+import '../providers/history_provider.dart';
+import '../models/history_item.dart';
 
 class ResultScreen extends StatefulWidget {
   const ResultScreen({super.key});
@@ -34,6 +38,8 @@ class _ResultScreenState extends State<ResultScreen> {
 
   late Map<String, File?> photos;
   late Map<String, dynamic> results;
+  bool _saved = false;
+  bool _saving = false;
 
   @override
   void didChangeDependencies() {
@@ -49,6 +55,38 @@ class _ResultScreenState extends State<ResultScreen> {
     }
   }
 
+  Future<void> _saveResult() async {
+    if (_saving || _saved) return;
+    setState(() => _saving = true);
+
+    final provider = Provider.of<HistoryProvider>(context, listen: false);
+
+    final item = HistoryItem(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      date: DateTime.now(),
+      cleanliness: results['cleanliness']['label'] as String,
+      cleanlinessConfidence: results['cleanliness']['confidence'] as int,
+      integrity: results['integrity']['label'] as String,
+      integrityConfidence: results['integrity']['confidence'] as int,
+      imagePath: photos['front']?.path, // сохраняем путь front (можно расширить)
+    );
+
+    await provider.addItem(item);
+
+    setState(() {
+      _saved = true;
+      _saving = false;
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Результат сохранён в истории'),
+        backgroundColor: Color(0xFF32D583),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -58,6 +96,12 @@ class _ResultScreenState extends State<ResultScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () => Navigator.pushNamed(context, '/history'),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -102,7 +146,6 @@ class _ResultScreenState extends State<ResultScreen> {
                 );
               }).toList(),
 
-              // Здесь показываем результат только один раз после всех фото
               Text(
                 'Результаты анализа',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -133,15 +176,9 @@ class _ResultScreenState extends State<ResultScreen> {
                 child: const Text('Проверить другое фото'),
               ),
               const SizedBox(height: 12),
+
               OutlinedButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Результаты сохранены'),
-                      backgroundColor: Color(0xFF32D583),
-                    ),
-                  );
-                },
+                onPressed: _saved ? null : _saveResult,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF32D583),
                   side: const BorderSide(color: Color(0xFF32D583)),
@@ -151,7 +188,13 @@ class _ResultScreenState extends State<ResultScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 ),
-                child: const Text('Сохранить результат'),
+                child: _saving
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(_saved ? 'Сохранено' : 'Сохранить результат'),
               ),
             ],
           ),
