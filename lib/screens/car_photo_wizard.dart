@@ -3,7 +3,12 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
+import 'package:indrive_car_condition/models/history_item.dart';
+import 'package:indrive_car_condition/providers/history_provider.dart';
 import 'package:indrive_car_condition/widgets/exit.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:provider/provider.dart';
+
 
 class CarPhotoWizard extends StatefulWidget {
   const CarPhotoWizard({super.key});
@@ -26,25 +31,33 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
   bool _flashOn = false;
   File? _previewPhoto;
 
+  /// --- Audio helper ---
+  late AudioPlayer _player;
+  bool _soundOn = true;
+
   final List<Map<String, String>> _steps = [
     {
       "title": "Фото спереди",
       "overlay": "assets/overlays/car_front.png",
+      "audio": "assets/audio/car_front.mp3",
       "key": "front"
     },
     {
       "title": "Фото слева",
       "overlay": "assets/overlays/car_left.png",
+      "audio": "assets/audio/car_left.mp3",
       "key": "left"
     },
     {
       "title": "Фото справа",
       "overlay": "assets/overlays/car_right.png",
+      "audio": "assets/audio/car_right.mp3",
       "key": "right"
     },
     {
       "title": "Фото сзади",
       "overlay": "assets/overlays/car_back.png",
+      "audio": "assets/audio/car_back.mp3",
       "key": "back"
     },
   ];
@@ -52,8 +65,10 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
   @override
   void initState() {
     super.initState();
+    _player = AudioPlayer();
     _lockLandscape();
     _initCamera();
+    _playCurrentStepAudio(); // проигрываем подсказку для первого шага
   }
 
   Future<void> _lockLandscape() async {
@@ -84,24 +99,70 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
   }
 
   Future<void> _confirmPhoto() async {
-    final stepKey = _steps[_currentStep]["key"]!;
-    setState(() {
-      _photos[stepKey] = _previewPhoto;
-      _previewPhoto = null;
-    });
+  final stepKey = _steps[_currentStep]["key"]!;
+  setState(() {
+    _photos[stepKey] = _previewPhoto;
+    _previewPhoto = null;
+  });
 
-    if (_currentStep < _steps.length - 1) {
-      setState(() => _currentStep++);
-    } else {
-      Navigator.pushReplacementNamed(context, "/result", arguments: _photos);
-    }
+  if (_currentStep < _steps.length - 1) {
+    setState(() => _currentStep++);
+    _playCurrentStepAudio();
+  } else {
+    // ✅ Генерим результаты
+    final results = _generateMockResults();
+    
+    // ✅ Создаём HistoryItem
+    final item = HistoryItem(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      date: DateTime.now(),
+      cleanliness: results['cleanliness']['label'] as String,
+      cleanlinessConfidence: results['cleanliness']['confidence'] as int,
+      integrity: results['integrity']['label'] as String,
+      integrityConfidence: results['integrity']['confidence'] as int,
+      imagePath: _photos['front']?.path,
+    );
+
+    // ✅ Сохраняем в историю сразу
+    final provider = Provider.of<HistoryProvider>(context, listen: false);
+    await provider.addItem(item);
+
+    if (!mounted) return;
+
+    // Переходим на экран результатов уже с готовым item
+    Navigator.pushReplacementNamed(
+      context,
+      "/result",
+      arguments: item,
+    );
   }
+}
+
 
   Future<void> _toggleFlash() async {
     if (_controller == null) return;
     _flashOn = !_flashOn;
     await _controller!.setFlashMode(_flashOn ? FlashMode.torch : FlashMode.off);
     setState(() {});
+  }
+
+  /// --- Аудио помощник ---
+  Future<void> _playCurrentStepAudio() async {
+    if (!_soundOn) return;
+    final audioPath = _steps[_currentStep]["audio"]!;
+    await _player.stop();
+    await _player.play(AssetSource(audioPath.replaceFirst("assets/", "")));
+  }
+
+  void _toggleSound() {
+    setState(() {
+      _soundOn = !_soundOn;
+    });
+    if (_soundOn) {
+      _playCurrentStepAudio();
+    } else {
+      _player.stop();
+    }
   }
 
   @override
@@ -150,14 +211,28 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
                       ),
                     ),
 
-                    // 🔄 Заменено: вертикальная панель справа
+                    // Панель справа (камера, вспышка, звук)
                     Positioned(
                       right: 20,
                       top: 0,
                       bottom: 0,
                       child: Column(
                         children: [
-                        const Spacer(flex: 2),
+                          // кнопка звука
+                          Transform.rotate(
+                            angle: 2 * pi,
+                            child: IconButton(
+                              icon: Icon(
+                                _soundOn ? Icons.volume_up : Icons.volume_off,
+                                color: Colors.white,
+                                size: 32,
+                              ),
+                              onPressed: _toggleSound,
+                            ),
+                          ),
+                          const Spacer(flex: 2),
+
+                          // кнопка фото
                           Transform.rotate(
                             angle: 2 * pi,
                             child: GestureDetector(
@@ -178,7 +253,10 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
                               ),
                             ),
                           ),
-                        const Spacer(flex: 1),
+
+                          const Spacer(flex: 1),
+
+                          // кнопка вспышки
                           Transform.rotate(
                             angle: 2 * pi,
                             child: IconButton(
@@ -235,7 +313,30 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
   @override
   void dispose() {
     _controller?.dispose();
+    _player.dispose();
     SystemChrome.setPreferredOrientations(DeviceOrientation.values);
     super.dispose();
   }
+
+  Map<String, dynamic> _generateMockResults() {
+  final random = Random();
+
+  final cleanlinessOptions = [
+    {'label': 'Чистый', 'confidence': 85 + random.nextInt(15)},
+    {'label': 'Слегка грязный', 'confidence': 75 + random.nextInt(20)},
+    {'label': 'Сильно грязный', 'confidence': 80 + random.nextInt(20)},
+  ];
+
+  final integrityOptions = [
+    {'label': 'Целый', 'confidence': 90 + random.nextInt(10)},
+    {'label': 'Повреждённый', 'confidence': 85 + random.nextInt(15)},
+  ];
+
+  return {
+    'cleanliness':
+        cleanlinessOptions[random.nextInt(cleanlinessOptions.length)],
+    'integrity': integrityOptions[random.nextInt(integrityOptions.length)],
+  };
+}
+
 }

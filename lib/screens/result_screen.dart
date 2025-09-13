@@ -1,94 +1,30 @@
-// lib/screens/result_screen.dart
-import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
 import '../widgets/result_card.dart';
-import 'dart:math' as math;
-import 'package:provider/provider.dart';
-import '../providers/history_provider.dart';
 import '../models/history_item.dart';
 
-class ResultScreen extends StatefulWidget {
+class ResultScreen extends StatelessWidget {
   const ResultScreen({super.key});
 
   @override
-  State<ResultScreen> createState() => _ResultScreenState();
-}
-
-class _ResultScreenState extends State<ResultScreen> {
-  // Мок-генератор результатов (для всех фото один раз)
-  Map<String, dynamic> _generateMockResults() {
-    final random = math.Random();
-
-    final cleanlinessOptions = [
-      {'label': 'Чистый', 'confidence': 85 + random.nextInt(15)},
-      {'label': 'Слегка грязный', 'confidence': 75 + random.nextInt(20)},
-      {'label': 'Сильно грязный', 'confidence': 80 + random.nextInt(20)},
-    ];
-
-    final integrityOptions = [
-      {'label': 'Целый', 'confidence': 90 + random.nextInt(10)},
-      {'label': 'Повреждённый', 'confidence': 85 + random.nextInt(15)},
-    ];
-
-    return {
-      'cleanliness': cleanlinessOptions[random.nextInt(cleanlinessOptions.length)],
-      'integrity': integrityOptions[random.nextInt(integrityOptions.length)],
-    };
-  }
-
-  late Map<String, File?> photos;
-  late Map<String, dynamic> results;
-  bool _saved = false;
-  bool _saving = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (args != null && args is Map<String, File?>) {
-      photos = args;
-      results = _generateMockResults();
-    } else {
-      photos = {'front': null, 'left': null, 'right': null, 'back': null};
-      results = _generateMockResults();
-    }
-  }
-
-  Future<void> _saveResult() async {
-    if (_saving || _saved) return;
-    setState(() => _saving = true);
-
-    final provider = Provider.of<HistoryProvider>(context, listen: false);
-
-    final item = HistoryItem(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      date: DateTime.now(),
-      cleanliness: results['cleanliness']['label'] as String,
-      cleanlinessConfidence: results['cleanliness']['confidence'] as int,
-      integrity: results['integrity']['label'] as String,
-      integrityConfidence: results['integrity']['confidence'] as int,
-      imagePath: photos['front']?.path, // сохраняем путь front (можно расширить)
-    );
-
-    await provider.addItem(item);
-
-    setState(() {
-      _saved = true;
-      _saving = false;
-    });
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Результат сохранён в истории'),
-        backgroundColor: Color(0xFF32D583),
-      ),
-    );
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args == null || args is! HistoryItem) {
+      return Scaffold(
+        body: Center(
+          child: Text("Нет данных для отображения"),
+        ),
+      );
+    }
+
+    final HistoryItem item = args;
+
+    // Если нужно показать все стороны — расширяем HistoryItem или передаем Map<String,String?>
+    final Map<String, String?> photos = {
+      'front': item.imagePath,
+      // 'left': ..., 'right': ..., 'back': ...
+    };
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Результат проверки'),
@@ -111,7 +47,7 @@ class _ResultScreenState extends State<ResultScreen> {
             children: [
               ...photos.entries.map((entry) {
                 final side = entry.key;
-                final file = entry.value;
+                final path = entry.value;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -122,11 +58,11 @@ class _ResultScreenState extends State<ResultScreen> {
                           ),
                     ),
                     const SizedBox(height: 8),
-                    if (file != null)
+                    if (path != null)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.file(
-                          file,
+                          File(path),
                           height: 180,
                           fit: BoxFit.cover,
                         ),
@@ -156,45 +92,24 @@ class _ResultScreenState extends State<ResultScreen> {
               const SizedBox(height: 16),
               ResultCard(
                 title: 'Чистота',
-                result: results['cleanliness']['label'],
-                confidence: results['cleanliness']['confidence'],
+                result: item.cleanliness,
+                confidence: item.cleanlinessConfidence,
                 icon: Icons.cleaning_services,
-                color: _getCleanlinessColor(results['cleanliness']['label']),
+                color: _getCleanlinessColor(item.cleanliness),
               ),
               const SizedBox(height: 12),
               ResultCard(
                 title: 'Целостность',
-                result: results['integrity']['label'],
-                confidence: results['integrity']['confidence'],
+                result: item.integrity,
+                confidence: item.integrityConfidence,
                 icon: Icons.build_circle,
-                color: _getIntegrityColor(results['integrity']['label']),
+                color: _getIntegrityColor(item.integrity),
               ),
               const SizedBox(height: 24),
 
               ElevatedButton(
                 onPressed: () => Navigator.pushReplacementNamed(context, '/'),
-                child: const Text('Проверить другое фото'),
-              ),
-              const SizedBox(height: 12),
-
-              OutlinedButton(
-                onPressed: _saved ? null : _saveResult,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF32D583),
-                  side: const BorderSide(color: Color(0xFF32D583)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(_saved ? 'Сохранено' : 'Сохранить результат'),
+                child: const Text('Сфотографировать заново'),
               ),
             ],
           ),

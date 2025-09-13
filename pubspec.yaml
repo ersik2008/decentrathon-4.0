@@ -18,6 +18,8 @@ dependencies:
   provider: ^6.0.5
   hive: ^2.2.3
   hive_flutter: ^1.1.0
+  audioplayers: ^6.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -32,3 +34,4 @@ flutter:
     - assets/overlays/car_left.png
     - assets/overlays/car_right.png
     - assets/overlays/car_back.png
+    - assets/audio/
