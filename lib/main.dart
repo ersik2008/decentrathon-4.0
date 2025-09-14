@@ -24,10 +24,12 @@ Future<void> main() async {
   // Получаем камеры (как у тебя было)
   cameras = await availableCameras();
 
-  // Инициализируем Hive
-  await Hive.initFlutter();
-  Hive.registerAdapter(HistoryItemAdapter());
-  final box = await Hive.openBox('history_box'); // используем не generic, потому что adapter хранит HistoryItem
+await Hive.initFlutter();
+Hive.registerAdapter(HistoryItemAdapter());
+
+// Теперь открываем заново
+final box = await Hive.openBox('history_box');
+
 
   runApp(
     MultiProvider(

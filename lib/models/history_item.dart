@@ -1,7 +1,5 @@
-// lib/models/history_item.dart
 import 'package:hive/hive.dart';
 
-/// Модель истории (POJO)
 class HistoryItem {
   final String id;
   final DateTime date;
@@ -9,7 +7,10 @@ class HistoryItem {
   final int cleanlinessConfidence;
   final String integrity;
   final int integrityConfidence;
-  final String? imagePath; // путь к сохранённому фото (в internal storage)
+  final String? frontImage;
+  final String? leftImage;
+  final String? rightImage;
+  final String? backImage;
 
   HistoryItem({
     required this.id,
@@ -18,34 +19,31 @@ class HistoryItem {
     required this.cleanlinessConfidence,
     required this.integrity,
     required this.integrityConfidence,
-    this.imagePath,
+    this.frontImage,
+    this.leftImage,
+    this.rightImage,
+    this.backImage,
   });
 }
 
-/// Ручной TypeAdapter для Hive — не требует build_runner
+// Ручной адаптер Hive
 class HistoryItemAdapter extends TypeAdapter<HistoryItem> {
   @override
   final int typeId = 1;
 
   @override
   HistoryItem read(BinaryReader reader) {
-    final id = reader.readString();
-    final dateMillis = reader.readInt();
-    final cleanliness = reader.readString();
-    final cleanlinessConfidence = reader.readInt();
-    final integrity = reader.readString();
-    final integrityConfidence = reader.readInt();
-    final hasImage = reader.readBool();
-    final imagePath = hasImage ? reader.readString() : null;
-
     return HistoryItem(
-      id: id,
-      date: DateTime.fromMillisecondsSinceEpoch(dateMillis),
-      cleanliness: cleanliness,
-      cleanlinessConfidence: cleanlinessConfidence,
-      integrity: integrity,
-      integrityConfidence: integrityConfidence,
-      imagePath: imagePath,
+      id: reader.readString(),
+      date: DateTime.fromMillisecondsSinceEpoch(reader.readInt()),
+      cleanliness: reader.readString(),
+      cleanlinessConfidence: reader.readInt(),
+      integrity: reader.readString(),
+      integrityConfidence: reader.readInt(),
+      frontImage: reader.readBool() ? reader.readString() : null,
+      leftImage: reader.readBool() ? reader.readString() : null,
+      rightImage: reader.readBool() ? reader.readString() : null,
+      backImage: reader.readBool() ? reader.readString() : null,
     );
   }
 
@@ -57,9 +55,17 @@ class HistoryItemAdapter extends TypeAdapter<HistoryItem> {
     writer.writeInt(obj.cleanlinessConfidence);
     writer.writeString(obj.integrity);
     writer.writeInt(obj.integrityConfidence);
-    writer.writeBool(obj.imagePath != null);
-    if (obj.imagePath != null) {
-      writer.writeString(obj.imagePath!);
-    }
+
+    writer.writeBool(obj.frontImage != null);
+    if (obj.frontImage != null) writer.writeString(obj.frontImage!);
+
+    writer.writeBool(obj.leftImage != null);
+    if (obj.leftImage != null) writer.writeString(obj.leftImage!);
+
+    writer.writeBool(obj.rightImage != null);
+    if (obj.rightImage != null) writer.writeString(obj.rightImage!);
+
+    writer.writeBool(obj.backImage != null);
+    if (obj.backImage != null) writer.writeString(obj.backImage!);
   }
 }
