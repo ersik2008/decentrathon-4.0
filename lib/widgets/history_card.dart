@@ -77,7 +77,7 @@ class _HistoryCardState extends State<HistoryCard> {
             ),
 
             const SizedBox(height: 8),
-            // индикаторы страниц
+            // Индикаторы страниц
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(photos.length, (index) {
@@ -96,7 +96,7 @@ class _HistoryCardState extends State<HistoryCard> {
             ),
 
             const SizedBox(height: 12),
-            // дата проверки
+            // Дата проверки
             Text(
               _formatDate(widget.item.date),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -158,7 +158,7 @@ class _HistoryCardState extends State<HistoryCard> {
               style: TextStyle(
                   fontSize: 14, fontWeight: FontWeight.w600, color: color)),
           const SizedBox(height: 2),
-          Text('$confidence%',
+          Text('Уверенность: $confidence%',
               style: TextStyle(fontSize: 11, color: Colors.grey[500])),
         ],
       ),

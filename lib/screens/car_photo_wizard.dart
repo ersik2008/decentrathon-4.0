@@ -33,11 +33,33 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
   late AudioPlayer _player;
   bool _soundOn = true;
 
+  bool _isCapturing = false; // 🔹 флаг для защиты от повторного нажатия
+
   final List<Map<String, String>> _steps = [
-    {"title": "Фото спереди", "overlay": "assets/overlays/car_front.png", "audio": "assets/audio/car_front.mp3", "key": "front"},
-    {"title": "Фото слева", "overlay": "assets/overlays/car_left.png", "audio": "assets/audio/car_left.mp3", "key": "left"},
-    {"title": "Фото справа", "overlay": "assets/overlays/car_right.png", "audio": "assets/audio/car_right.mp3", "key": "right"},
-    {"title": "Фото сзади", "overlay": "assets/overlays/car_back.png", "audio": "assets/audio/car_back.mp3", "key": "back"},
+    {
+      "title": "Фото спереди",
+      "overlay": "assets/overlays/car_front.png",
+      "audio": "assets/audio/car_front.mp3",
+      "key": "front"
+    },
+    {
+      "title": "Фото слева",
+      "overlay": "assets/overlays/car_left.png",
+      "audio": "assets/audio/car_left.mp3",
+      "key": "left"
+    },
+    {
+      "title": "Фото справа",
+      "overlay": "assets/overlays/car_right.png",
+      "audio": "assets/audio/car_right.mp3",
+      "key": "right"
+    },
+    {
+      "title": "Фото сзади",
+      "overlay": "assets/overlays/car_back.png",
+      "audio": "assets/audio/car_back.mp3",
+      "key": "back"
+    },
   ];
 
   @override
@@ -58,7 +80,11 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
 
   Future<void> _initCamera() async {
     _cameras = await availableCameras();
-    _controller = CameraController(_cameras!.first, ResolutionPreset.high, enableAudio: false);
+    _controller = CameraController(
+      _cameras!.first,
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
     await _controller!.initialize();
     if (!mounted) return;
     setState(() {});
@@ -66,8 +92,19 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
 
   Future<void> _takePhoto() async {
     if (_controller == null || !_controller!.value.isInitialized) return;
-    final picture = await _controller!.takePicture();
-    setState(() => _previewPhoto = File(picture.path));
+    if (_isCapturing) return; // 🔹 игнорируем, если ещё идёт съёмка
+
+    try {
+      setState(() => _isCapturing = true);
+      final picture = await _controller!.takePicture();
+      setState(() {
+        _previewPhoto = File(picture.path);
+      });
+    } catch (e) {
+      debugPrint("Ошибка при съемке: $e");
+    } finally {
+      setState(() => _isCapturing = false);
+    }
   }
 
   Future<void> _confirmPhoto() async {
@@ -81,6 +118,7 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
       setState(() => _currentStep++);
       _playCurrentStepAudio();
     } else {
+      // 🔹 пока используем моковые результаты
       final results = _generateMockResults();
       final item = HistoryItem(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -95,7 +133,8 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
         backImage: _photos['back']?.path,
       );
 
-      final provider = Provider.of<HistoryProvider>(context, listen: false);
+      final provider =
+          Provider.of<HistoryProvider>(context, listen: false);
       await provider.addItem(item);
 
       if (!mounted) return;
@@ -115,15 +154,18 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
       {'label': 'Повреждённый', 'confidence': 85 + random.nextInt(15)},
     ];
     return {
-      'cleanliness': cleanlinessOptions[random.nextInt(cleanlinessOptions.length)],
-      'integrity': integrityOptions[random.nextInt(integrityOptions.length)],
+      'cleanliness':
+          cleanlinessOptions[random.nextInt(cleanlinessOptions.length)],
+      'integrity':
+          integrityOptions[random.nextInt(integrityOptions.length)],
     };
   }
 
   Future<void> _toggleFlash() async {
     if (_controller == null) return;
     _flashOn = !_flashOn;
-    await _controller!.setFlashMode(_flashOn ? FlashMode.torch : FlashMode.off);
+    await _controller!
+        .setFlashMode(_flashOn ? FlashMode.torch : FlashMode.off);
     setState(() {});
   }
 
@@ -136,8 +178,11 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
 
   void _toggleSound() {
     setState(() => _soundOn = !_soundOn);
-    if (_soundOn) _playCurrentStepAudio();
-    else _player.stop();
+    if (_soundOn) {
+      _playCurrentStepAudio();
+    } else {
+      _player.stop();
+    }
   }
 
   @override
@@ -186,7 +231,10 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+                          shadows: [Shadow(
+                            blurRadius: 4,
+                            color: Colors.black,
+                          )],
                         ),
                       ),
                     ),
@@ -199,8 +247,13 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
                           Transform.rotate(
                             angle: 2 * pi,
                             child: IconButton(
-                              icon: Icon(_soundOn ? Icons.volume_up : Icons.volume_off,
-                                  color: Colors.white, size: 32),
+                              icon: Icon(
+                                _soundOn
+                                    ? Icons.volume_up
+                                    : Icons.volume_off,
+                                color: Colors.white,
+                                size: 32,
+                              ),
                               onPressed: _toggleSound,
                             ),
                           ),
@@ -208,16 +261,25 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
                           Transform.rotate(
                             angle: 2 * pi,
                             child: GestureDetector(
-                              onTap: _takePhoto,
+                              onTap: _isCapturing ? null : _takePhoto,
                               child: Container(
                                 width: 72,
                                 height: 72,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Colors.white,
-                                  border: Border.all(color: Colors.grey.shade300, width: 4),
+                                  color: _isCapturing
+                                      ? Colors.grey
+                                      : Colors.white,
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                    width: 4,
+                                  ),
                                 ),
-                                child: const Icon(Icons.camera_alt, size: 32, color: Colors.black),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  size: 32,
+                                  color: Colors.black,
+                                ),
                               ),
                             ),
                           ),
@@ -225,8 +287,13 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
                           Transform.rotate(
                             angle: 2 * pi,
                             child: IconButton(
-                              icon: Icon(_flashOn ? Icons.flash_on : Icons.flash_off,
-                                  color: Colors.white, size: 32),
+                              icon: Icon(
+                                _flashOn
+                                    ? Icons.flash_on
+                                    : Icons.flash_off,
+                                color: Colors.white,
+                                size: 32,
+                              ),
                               onPressed: _toggleFlash,
                             ),
                           ),
@@ -234,22 +301,33 @@ class _CarPhotoWizardState extends State<CarPhotoWizard> {
                       ),
                     ),
                   ] else ...[
-                    Positioned.fill(child: Image.file(_previewPhoto!, fit: BoxFit.cover)),
+                    Positioned.fill(
+                      child: Image.file(
+                        _previewPhoto!,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                     Positioned(
                       bottom: 30,
                       left: 30,
                       right: 30,
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
                         children: [
                           ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                            onPressed: () => setState(() => _previewPhoto = null),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                            ),
+                            onPressed: () =>
+                                setState(() => _previewPhoto = null),
                             icon: const Icon(Icons.close),
                             label: const Text("Переснять"),
                           ),
                           ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                            ),
                             onPressed: _confirmPhoto,
                             icon: const Icon(Icons.check),
                             label: const Text("Подтвердить"),
